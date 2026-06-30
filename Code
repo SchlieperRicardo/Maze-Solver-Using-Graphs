@@ -1,0 +1,283 @@
+Code: 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
+
+#define MAX_LINHAS 100
+#define MAX_COLUNAS 100
+
+typedef struct
+{
+    int linha;
+    int coluna;
+} Posicao;
+
+char labirinto[MAX_LINHAS][MAX_COLUNAS + 1];
+
+int linhas;
+int colunas;
+
+void setColor(int cor)
+{
+    SetConsoleTextAttribute(
+        GetStdHandle(STD_OUTPUT_HANDLE),
+        cor
+    );
+}
+
+void exibirLabirinto(void)
+{
+    int i, j;
+
+    for(i = 0; i < linhas; i++)
+    {
+        for(j = 0; j < colunas; j++)
+        {
+            if(labirinto[i][j] == '*')
+            {
+                setColor(11); /* Azul */
+                printf("%c", labirinto[i][j]);
+                setColor(15);
+            }
+            else
+            {
+                printf("%c", labirinto[i][j]);
+            }
+        }
+
+        printf("\n");
+    }
+}
+
+Posicao encontrarEntrada(void)
+{
+    Posicao p;
+
+    p.linha = -1;
+    p.coluna = -1;
+
+    int i, j;
+
+    for(i = 0; i < linhas; i++)
+    {
+        for(j = 0; j < colunas; j++)
+        {
+            if(labirinto[i][j] == 'E')
+            {
+                p.linha = i;
+                p.coluna = j;
+                return p;
+            }
+        }
+    }
+
+    return p;
+}
+
+Posicao encontrarSaida(void)
+{
+    Posicao p;
+
+    p.linha = -1;
+    p.coluna = -1;
+
+    int i, j;
+
+    for(i = 0; i < linhas; i++)
+    {
+        for(j = 0; j < colunas; j++)
+        {
+            if(labirinto[i][j] == 'S')
+            {
+                p.linha = i;
+                p.coluna = j;
+                return p;
+            }
+        }
+    }
+
+    return p;
+}
+
+int carregarLabirinto(const char *nomeArquivo)
+{
+    FILE *arquivo;
+
+    arquivo = fopen(nomeArquivo, "r");
+
+    if(arquivo == NULL)
+    {
+        return 0;
+    }
+
+    char linhaTemp[MAX_COLUNAS + 1];
+
+    linhas = 0;
+
+    while(fgets(linhaTemp,
+                MAX_COLUNAS + 1,
+                arquivo))
+    {
+        linhaTemp[strcspn(linhaTemp, "\n")] = '\0';
+
+        /* Ignora títulos */
+        if(linhaTemp[0] != '#' &&
+           linhaTemp[0] != 'E')
+        {
+            continue;
+        }
+
+        strcpy(labirinto[linhas], linhaTemp);
+
+        linhas++;
+    }
+
+    fclose(arquivo);
+
+    if(linhas == 0)
+    {
+        return 0;
+    }
+
+    colunas = strlen(labirinto[0]);
+
+    return 1;
+}
+
+int bfs(void)
+{
+    Posicao fila[MAX_LINHAS * MAX_COLUNAS];
+
+    Posicao pai[MAX_LINHAS][MAX_COLUNAS];
+
+    int visitado[MAX_LINHAS][MAX_COLUNAS] = {0};
+
+    int inicioFila = 0;
+    int fimFila = 0;
+
+    int dl[4] = {-1, 1, 0, 0};
+    int dc[4] = {0, 0, -1, 1};
+
+    Posicao entrada = encontrarEntrada();
+    Posicao saida = encontrarSaida();
+
+    if(entrada.linha == -1 || saida.linha == -1)
+    {
+        printf("Entrada ou saida nao encontrada.\n");
+        return 0;
+    }
+
+    fila[fimFila++] = entrada;
+
+    visitado[entrada.linha][entrada.coluna] = 1;
+
+    pai[entrada.linha][entrada.coluna] = entrada;
+
+    while(inicioFila < fimFila)
+    {
+        Posicao atual = fila[inicioFila++];
+
+        if(atual.linha == saida.linha &&
+           atual.coluna == saida.coluna)
+        {
+            int passos = 0;
+
+            Posicao p = saida;
+
+            while(!(p.linha == entrada.linha &&
+                    p.coluna == entrada.coluna))
+            {
+                Posicao anterior =
+                    pai[p.linha][p.coluna];
+
+                if(labirinto[p.linha][p.coluna] != 'S')
+                {
+                    labirinto[p.linha][p.coluna] = '*';
+                }
+
+                p = anterior;
+
+                passos++;
+            }
+
+            printf("\n");
+            printf("=====================================\n");
+            printf("RESULTADO DA BFS\n");
+            printf("=====================================\n");
+            printf("Menor caminho encontrado!\n");
+            printf("Quantidade de passos: %d\n",
+                   passos);
+
+            return 1;
+        }
+
+        int i;
+
+        for(i = 0; i < 4; i++)
+        {
+            int nl = atual.linha + dl[i];
+            int nc = atual.coluna + dc[i];
+
+            if(nl >= 0 &&
+               nl < linhas &&
+               nc >= 0 &&
+               nc < colunas)
+            {
+                if(!visitado[nl][nc] &&
+                   labirinto[nl][nc] != '#')
+                {
+                    visitado[nl][nc] = 1;
+
+                    pai[nl][nc] = atual;
+
+                    fila[fimFila].linha = nl;
+                    fila[fimFila].coluna = nc;
+
+                    fimFila++;
+                }
+            }
+        }
+    }
+
+    return 0;
+}
+
+int main(void)
+{
+    char nomeArquivo[100];
+
+    printf("Digite o nome do arquivo: ");
+    scanf("%99s", nomeArquivo);
+
+    if(!carregarLabirinto(nomeArquivo))
+    {
+        printf("Erro ao abrir o arquivo.\n");
+        return 1;
+    }
+
+    printf("\n");
+    printf("=====================================\n");
+    printf("LABIRINTO ORIGINAL\n");
+    printf("=====================================\n\n");
+
+    exibirLabirinto();
+
+    if(bfs())
+    {
+        printf("\n");
+        printf("=====================================\n");
+        printf("LABIRINTO RESOLVIDO\n");
+        printf("=====================================\n\n");
+
+        exibirLabirinto();
+    }
+    else
+    {
+        printf("\nNao existe caminho entre E e S.\n");
+    }
+
+    system("pause");
+
+    return 0;
+}
